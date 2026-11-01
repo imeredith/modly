@@ -3,7 +3,7 @@ import { persist, createJSONStorage } from 'zustand/middleware'
 
 export type ThinkingMode = 'auto' | 'on' | 'off'
 
-export type ProviderId = 'local' | 'ollama' | 'openai' | 'anthropic' | 'mistral' | 'groq' | 'openrouter' | 'custom'
+export type ProviderId = 'local' | 'codex' | 'ollama' | 'openai' | 'anthropic' | 'mistral' | 'groq' | 'openrouter' | 'custom'
 
 export interface ExternalConfig {
   apiKey:  string
@@ -15,7 +15,8 @@ export const PROVIDERS: Record<ProviderId, { label: string; baseUrl: string; noK
   local:      { label: 'Local (llama.cpp)', baseUrl: '' },
   // Ollama serves an OpenAI-compatible API — reuses models already pulled with it.
   ollama:     { label: 'Ollama',            baseUrl: 'http://localhost:11434/v1', noKey: true },
-  openai:     { label: 'ChatGPT (OpenAI)',  baseUrl: 'https://api.openai.com/v1' },
+  codex:      { label: 'Codex (ChatGPT subscription)', baseUrl: '', noKey: true },
+  openai:     { label: 'OpenAI (API key)',  baseUrl: 'https://api.openai.com/v1' },
   anthropic:  { label: 'Claude (Anthropic)', baseUrl: 'https://api.anthropic.com/v1' },
   mistral:    { label: 'Mistral',           baseUrl: 'https://api.mistral.ai/v1' },
   groq:       { label: 'Groq',              baseUrl: 'https://api.groq.com/openai/v1' },

@@ -356,3 +356,24 @@ MIT License — see [LICENSE](LICENSE) for details.
 > Based on [Modly](https://github.com/lightningpixel/modly) by [Lightning Pixel](https://github.com/lightningpixel)
 
 This is a requirement of the MIT license attribution clause. Please keep this credit visible in your app's UI or documentation.
+
+### Use a Codex subscription for the built-in chat
+
+1. Install a current [official Codex CLI](https://learn.chatgpt.com/docs/cli) on the
+   same machine as Modly (it must support `codex exec --ignore-user-config`): `npm install -g @openai/codex`.
+2. Run `codex login` in a terminal and choose **Sign in with ChatGPT**, using an
+   account with Codex access. API-key login uses separate billing and is not
+   accepted by the subscription provider.
+3. Restart Modly so its API process can find `codex` on `PATH`. In
+   **Settings → Agent**, select **Codex (ChatGPT subscription)** and click
+   **Check connection**. Optionally enter a model available to your account and
+   click **Save**; a blank model uses the CLI’s built-in default. User Codex model and tool
+   configuration is excluded; specify model overrides here.
+4. Open the built-in chat and ask it to list workflows or inspect your mesh.
+
+Codex manages sign-in credentials and token refresh; Modly does not copy tokens
+into its settings. Subscription usage limits apply. The provider supports Modly
+mesh/workflow tools and PNG, JPEG and WebP attachments. Answers appear after
+each inference round completes rather than token by token. The Codex CLI must
+remain installed; packaged Modly does not bundle it. To change accounts or sign
+out, use `codex logout` / `codex login` in a terminal.

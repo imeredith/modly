@@ -380,6 +380,7 @@ export default function ChatPanel(): JSX.Element {
           model,
           provider: isLocal
             ? { type: 'local' }
+            : provider === 'codex' ? { type: 'codex' }
             : { type: 'external', base_url: providerBaseUrl(provider, externalConfig), api_key: externalConfig?.apiKey ?? '' },
           context,
           thinking: thinkingMode,
