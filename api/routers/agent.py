@@ -12,7 +12,7 @@ from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
-from services import llm_server
+from services import llm_server, codex_subscription
 from services.llm_server import llama_pool
 
 router = APIRouter(prefix="/agent", tags=["agent"])
@@ -609,7 +609,7 @@ class ChatMessage(BaseModel):
 
 
 class ProviderConfig(BaseModel):
-    type: str = "local"            # "local" | "external"
+    type: str = "local"            # "local" | "external" | "codex"
     base_url: Optional[str] = None  # external only, e.g. https://api.openai.com/v1
     api_key: Optional[str] = None
 
@@ -648,6 +648,11 @@ def _auth_headers(base_url: str, api_key: Optional[str]) -> dict:
 class ExternalModelsRequest(BaseModel):
     base_url: str
     api_key: str = ""
+
+
+@router.get("/codex/status")
+async def codex_status():
+    return await codex_subscription.status()
 
 
 @router.post("/external/models")
@@ -972,6 +977,9 @@ async def _chat_events(request: AgentChatRequest):
         extra.update(llm_server.sampling_for(request.model))
         if request.thinking == "off":
             extra["chat_template_kwargs"] = {"enable_thinking": False}
+    elif request.provider.type == "codex":
+        base_url = "Codex CLI"
+        headers = {}
     else:
         if not request.provider.base_url:
             yield _done("No provider URL configured. Set one in Settings → Agent.", [], [], error=True)
@@ -992,6 +1000,9 @@ async def _chat_events(request: AgentChatRequest):
         async with httpx.AsyncClient(timeout=120.0) as client:
 
             async def post() -> httpx.Response:
+                if request.provider.type == "codex":
+                    delta = await codex_subscription.complete(messages, TOOLS, request.model, request.thinking)
+                    return httpx.Response(200, json={"choices": [{"message": delta}]})
                 return await client.send(
                     client.build_request(
                         "POST",
@@ -1044,6 +1055,8 @@ async def _chat_events(request: AgentChatRequest):
                     actions_done.append(ActionDone(tool=fn["name"], result=result_text, payload=payload))
                     yield {"type": "tool_done", "id": tc["id"], "tool": fn["name"], "result": result_text, "payload": payload}
                     messages.append({"role": "tool", "tool_call_id": tc["id"], "content": result_text})
+    except (codex_subscription.CodexError, OSError, asyncio.TimeoutError) as e:
+        error = str(e) or "Codex request timed out. Try again."
     except httpx.HTTPError as e:
         error = f"Could not reach the LLM at {base_url}: {e}"
     finally:

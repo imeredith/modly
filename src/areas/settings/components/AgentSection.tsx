@@ -145,6 +145,18 @@ export function AgentSection(): JSX.Element {
   const [extTesting, setExtTesting]       = useState(false)
   const [extResult, setExtResult]         = useState<'ok' | 'error' | null>(null)
 
+  const [codexStatus, setCodexStatus] = useState<string | null>(null)
+
+  async function checkCodex() {
+    setCodexStatus('Checking…')
+    try {
+      const res = await fetch(`${apiUrl}/agent/codex/status`)
+      if (!res.ok) throw new Error('Connection check failed')
+      const data: { message: string } = await res.json()
+      setCodexStatus(data.message)
+    } catch { setCodexStatus('Could not reach Modly’s API.') }
+  }
+
   const [mcpClient, setMcpClient] = useState<McpClient>('claude')
 
   const refreshLocal = useCallback(async () => {
@@ -245,7 +257,7 @@ export function AgentSection(): JSX.Element {
         <div className="flex flex-col gap-4 min-w-0">
 
           <Card title="Provider" description="Which model answers in the chat.">
-            <Block label="LLM provider" hint="Local runs entirely on this machine via llama.cpp. External providers require an API key.">
+            <Block label="LLM provider" hint="Local runs entirely on this machine via llama.cpp. Codex uses your ChatGPT subscription; other external providers use API keys.">
               <select
                 value={provider}
                 onChange={(e) => setProvider(e.target.value as ProviderId)}
@@ -334,6 +346,23 @@ export function AgentSection(): JSX.Element {
                     <option key={n} value={String(n)}>{n}</option>
                   ))}
                 </select>
+              </Block>
+            </Card>
+          ) : provider === 'codex' ? (
+            <Card title="Codex subscription" description="Use the official Codex CLI signed in with ChatGPT.">
+              <Block label="Setup" hint="Install Codex on this machine, then sign in with a ChatGPT account that has Codex access. Restart Modly after installing so it can find codex on PATH.">
+                <code className="text-xs text-zinc-300">npm install -g @openai/codex</code>
+                <code className="text-xs text-zinc-300">codex login</code>
+                <p className="text-[11px] text-zinc-500">Choose Sign in with ChatGPT. Credentials and token refresh are managed by Codex. Subscription usage limits apply.</p>
+                <button onClick={checkCodex} className={`self-start ${secondaryBtnCls}`}>Check connection</button>
+                {codexStatus && <p role="status" className="text-xs text-zinc-300">{codexStatus}</p>}
+              </Block>
+              <Block label="Model (optional)" hint="Leave blank to use your Codex default, or enter a model available to your account.">
+                <input value={extModelDraft} onChange={(e) => setExtModelDraft(e.target.value)} placeholder="Codex default" className={inputCls} />
+              </Block>
+              <Block>
+                <p className="text-[11px] text-zinc-500">Answers appear when each Codex round completes. Modly tools and image attachments are supported.</p>
+                <button onClick={saveExternal} className={`self-start ${primaryBtnCls}`}>Save</button>
               </Block>
             </Card>
           ) : (
