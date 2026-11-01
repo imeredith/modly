@@ -6,8 +6,10 @@
   "author": "Modly",
   "private": true,
   "scripts": {
+    "predev": "install-electron",
     "dev": "node scripts/build-builtins.mjs && electron-vite dev",
     "build": "node scripts/build-builtins.mjs && electron-vite build",
+    "prepreview": "install-electron",
     "preview": "electron-vite preview",
     "prepare": "node scripts/setup-hooks.mjs",
     "prepare-resources": "node scripts/download-python-embed.js",

@@ -31,6 +31,15 @@ launch.bat
 ./launch.sh
 ```
 
+The first launch downloads the Electron runtime if it is missing. Subsequent
+launches reuse it. This also applies to `npm run dev` and `npm run preview`.
+
+If an older checkout reports `Error: Electron uninstall` after a successful
+build, run `npm exec --no -- install-electron` from the repository directory,
+then retry the launcher. Electron 42 no longer downloads its runtime during
+`npm install`, while electron-vite expects it to be installed before starting.
+If the download fails, check the reported network or proxy error and retry.
+
 ---
 
 
