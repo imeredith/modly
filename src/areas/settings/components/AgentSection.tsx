@@ -357,8 +357,8 @@ export function AgentSection(): JSX.Element {
                 <button onClick={checkCodex} className={`self-start ${secondaryBtnCls}`}>Check connection</button>
                 {codexStatus && <p role="status" className="text-xs text-zinc-300">{codexStatus}</p>}
               </Block>
-              <Block label="Model (optional)" hint="Leave blank to use your Codex default, or enter a model available to your account.">
-                <input value={extModelDraft} onChange={(e) => setExtModelDraft(e.target.value)} placeholder="Codex default" className={inputCls} />
+              <Block label="Model (optional)" hint="Leave blank to use the CLI’s built-in default, or enter a model available to your account.">
+                <input value={extModelDraft} onChange={(e) => setExtModelDraft(e.target.value)} placeholder="CLI default" className={inputCls} />
               </Block>
               <Block>
                 <p className="text-[11px] text-zinc-500">Answers appear when each Codex round completes. Modly tools and image attachments are supported.</p>

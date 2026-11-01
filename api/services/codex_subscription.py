@@ -76,7 +76,9 @@ async def complete(messages: list[dict], tools: list[dict], model: str, thinking
             },
         }
         (root / "schema.json").write_text(json.dumps(schema), encoding="utf-8")
-        args = ["exec", "--ephemeral", "--skip-git-repo-check", "--sandbox", "read-only",
+        # Keep CODEX_HOME for managed authentication, but exclude user MCP servers,
+        # hooks and provider configuration. Older CLIs fail closed on this flag.
+        args = ["exec", "--ignore-user-config", "--ephemeral", "--skip-git-repo-check", "--sandbox", "read-only",
                 "-c", 'forced_login_method="chatgpt"', "-c", 'model_provider="openai"',
                 "-c", 'web_search="disabled"', "-c", "features.shell_tool=false",
                 "-c", "project_doc_max_bytes=0", "--output-schema", str(root / "schema.json"),

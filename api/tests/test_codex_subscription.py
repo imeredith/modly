@@ -1,5 +1,12 @@
 import asyncio
 import json
+import http.server
+import os
+import shutil
+import subprocess
+import sys
+import tempfile
+import threading
 from pathlib import Path
 import unittest
 from unittest import mock
@@ -38,6 +45,7 @@ class CodexTests(unittest.TestCase):
         with mock.patch.object(codex, "_run", side_effect=run):
             result = asyncio.run(codex.complete(messages, agent.TOOLS, "test-model", "off"))
         self.assertIn('forced_login_method="chatgpt"', recorded["args"])
+        self.assertIn("--ignore-user-config", recorded["args"])
         self.assertIn("read-only", recorded["args"])
         self.assertIn("test-model", recorded["args"])
         self.assertIn("Generate from this", recorded["prompt"].decode())
@@ -110,3 +118,88 @@ class CodexTests(unittest.TestCase):
                     asyncio.run(codex._run(["exec"]))
             proc.kill.assert_called_once()
             proc.wait.assert_awaited_once()
+
+
+class CodexConfigIsolationTests(unittest.TestCase):
+    @unittest.skipUnless(shutil.which("codex"), "Codex CLI is not installed")
+    def test_required_user_mcp_is_not_initialized(self):
+        """Exercise the real CLI, using only a local, unauthenticated test provider.
+
+        The control invocation proves this config starts a failing MCP process.
+        The production invocation must answer without starting that process.
+        """
+        help_result = subprocess.run(
+            [shutil.which("codex"), "exec", "--help"], capture_output=True, timeout=15,
+        )
+        if b"--ignore-user-config" not in help_result.stdout:
+            self.skipTest("Codex CLI does not support --ignore-user-config")
+
+        class Handler(http.server.BaseHTTPRequestHandler):
+            def log_message(self, *args):
+                pass
+
+            def do_POST(self):
+                self.rfile.read(int(self.headers["Content-Length"]))
+                self.send_response(200)
+                self.send_header("Content-Type", "text/event-stream")
+                self.end_headers()
+                events = [
+                    {"type": "response.output_item.done", "output_index": 0, "item": {
+                        "id": "msg_test", "type": "message", "role": "assistant",
+                        "content": [{"type": "output_text", "text": json.dumps({
+                            "message": "Isolated answer", "tool_calls": [],
+                        })}],
+                    }},
+                    {"type": "response.completed", "response": {
+                        "id": "resp_test", "output": [],
+                        "usage": {"input_tokens": 1, "output_tokens": 1, "total_tokens": 2},
+                    }},
+                ]
+                for event in events:
+                    self.wfile.write(("data: " + json.dumps(event) + "\n\n").encode())
+
+        with tempfile.TemporaryDirectory(prefix="modly-codex-config-test-") as directory:
+            home = Path(directory)
+            marker = home / "mcp-started"
+            command = f"from pathlib import Path; Path({str(marker)!r}).touch(); raise SystemExit(1)"
+            (home / "config.toml").write_text(
+                '[mcp_servers.unrelated]\n'
+                f'command = {json.dumps(sys.executable)}\n'
+                f'args = {json.dumps(["-c", command])}\n'
+                'required = true\nstartup_timeout_sec = 2\n', encoding="utf-8",
+            )
+            server = http.server.HTTPServer(("127.0.0.1", 0), Handler)
+            thread = threading.Thread(target=server.serve_forever, daemon=True)
+            thread.start()
+            real_run = codex._run
+
+            async def local_run(args, **kwargs):
+                # Only replace the inference endpoint. All production isolation,
+                # sandbox, auth policy, schema and stdin arguments remain intact.
+                overrides = [
+                    "-c", 'model_provider="modly_test"',
+                    "-c", 'model_providers.modly_test.name="Modly test"',
+                    "-c", f'model_providers.modly_test.base_url="http://127.0.0.1:{server.server_port}"',
+                    "-c", 'model_providers.modly_test.wire_api="responses"',
+                    "-c", "model_providers.modly_test.requires_openai_auth=false",
+                ]
+                return await real_run([*args[:-1], *overrides, args[-1]], timeout=20, **kwargs)
+
+            async def control_run(args, **kwargs):
+                return await local_run([a for a in args if a != "--ignore-user-config"], **kwargs)
+
+            try:
+                with mock.patch.dict(os.environ, {"CODEX_HOME": directory}):
+                    with mock.patch.object(codex, "_run", side_effect=control_run):
+                        with self.assertRaises(codex.CodexError):
+                            asyncio.run(codex.complete([], agent.TOOLS, "modly-test", "auto"))
+                    self.assertTrue(marker.exists(), "Control must initialize the broken MCP server")
+                    marker.unlink()
+                    with mock.patch.object(codex, "_run", side_effect=local_run):
+                        answer = asyncio.run(codex.complete([], agent.TOOLS, "modly-test", "auto"))
+                    self.assertEqual(answer, {"content": "Isolated answer", "tool_calls": []})
+                    self.assertFalse(marker.exists(), "Modly must not initialize user MCP integrations")
+            finally:
+                server.shutdown()
+                server.server_close()
+                thread.join(timeout=5)
