@@ -35,10 +35,20 @@ The first launch downloads the Electron runtime if it is missing. Subsequent
 launches reuse it. This also applies to `npm run dev` and `npm run preview`.
 
 If an older checkout reports `Error: Electron uninstall` after a successful
-build, run `npm exec --no -- install-electron` from the repository directory,
+build, run `npm run prepreview` from the repository directory,
 then retry the launcher. Electron 42 no longer downloads its runtime during
 `npm install`, while electron-vite expects it to be installed before starting.
 If the download fails, check the reported network or proxy error and retry.
+The startup installer uses a temporary directory beside the Electron package
+and removes it afterwards, avoiding system `/tmp` quotas. On older checkouts,
+an `Unknown system error -122` during installation means the disk quota was
+exceeded. On Linux/macOS, retry with a temporary directory on the project disk:
+
+```bash
+mkdir -p node_modules/.cache/electron-tmp
+TMPDIR="$PWD/node_modules/.cache/electron-tmp" npm run prepreview
+./launch.sh
+```
 
 ---
 
