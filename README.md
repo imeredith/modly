@@ -59,6 +59,13 @@ pip install -r requirements.txt
 npm run dev
 ```
 
+### Access from other computers on a LAN
+
+The Python API can be served over HTTP on a LAN. The full desktop interface
+currently requires Electron and cannot be used from another computer's browser.
+See [LAN access over HTTP](docs/lan-access.md) for API setup, limitations, and
+the work needed for a browser interface.
+
 ### 4. Test
 
 ```bash
